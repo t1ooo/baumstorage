@@ -1,0 +1,94 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+
+services:
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    ports:
+        - 2181:2181
+    environment:
+        - ALLOW_ANONYMOUS_LOGIN=yes
+
+
+  kafka:
+    image: bitnami/kafka:latest
+    ports:
+      - 9092:9092
+      - 9093:9093
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+        - zookeeper
+
+  db_zero:
+    image: postgres
+    restart: always
+    hostname: db_zero
+    environment:
+      POSTGRES_PASSWORD: pass
+      POSTGRES_USER: user
+      POSTGRES_DB: appdb
+      PGDATA: /data/postgres
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_zero:/data/postgres
+  
+  db_one:
+    image: postgres
+    restart: always
+    hostname: db_one
+    environment:
+      POSTGRES_PASSWORD: pass
+      POSTGRES_USER: user
+      POSTGRES_DB: appdb
+      PGDATA: /data/postgres
+    ports:
+      - 5433:5432
+    volumes:
+      - postgres_one:/data/postgres
+
+
+  ms_zero:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    depends_on:
+      - db_zero
+      - kafka
+    environment:
+      - POSTGRESQL=postgresql://user:pass@db_zero:5432/appdb
+      - KAFKA=kafka:9092
+      - BIT=0
+    ports:
+      - 9000:80
+    restart: always
+  
+  ms_one:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    depends_on:
+      - db_one
+      - kafka
+    environment:
+      - POSTGRESQL=postgresql://user:pass@db_one:5432/appdb
+      - KAFKA=kafka:9092
+      - BIT=1
+    ports:
+      - 9001:80
+    restart: always
+
+
+volumes:
+  postgres_zero:
+  postgres_one:
